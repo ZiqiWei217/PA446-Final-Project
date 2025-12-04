@@ -1,0 +1,146 @@
+---
+title: "Chicago Traffic Crash Analysis & Prediction"
+author: "Ziqi Wei"
+format: html
+editor: visual
+---
+# 1. Project Goal
+
+The goal of this analysis is to use machine learning to predict whether a traffic crash in Chicago will result in an injury (Injury vs. No Injury). We will also identify the most important risk factors (e.g., weather, lighting, speed).
+
+This analysis supports the "Vision Zero" dashboard by providing statistical evidence for road safety interventions.
+
+# 2. Setup & Data Loading
+
+```{r}
+library(tidyverse) 
+library(tidymodels)
+library(vip)
+library(xgboost)
+
+set.seed(123)
+# Load the cleaned data
+crashes_clean <- readRDS("../data/crashes_clean.rds")
+
+# Quick check
+glimpse(crashes_clean)
+```
+
+# 3. Feature Selection & Splitting
+
+We will use the following features to predict `injury_category`:
+
+*   **Environmental:** `weather_condition`, `lighting_condition`, `roadway_surface_cond`
+
+*   **Temporal:** `crash_hour`, `season`, `is_weekend`
+
+*   **Infrastructure:** `posted_speed_limit`
+
+```{r}
+# Convert character strings to factors (required for modeling)
+model_data <- crashes_clean %>%
+  mutate(
+    injury_category = as.factor(injury_category),
+    weather_condition = as.factor(weather_condition),
+    lighting_condition = as.factor(lighting_condition),
+    roadway_surface_cond = as.factor(roadway_surface_cond),
+    season = as.factor(season),
+    is_weekend = as.factor(is_weekend)
+  ) %>%
+  drop_na()
+
+# Split data: 75% for Training, 25% for Testing
+data_split <- initial_split(model_data, prop = 0.75, strata = injury_category)
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+
+print(paste("Training Set:", nrow(train_data), "rows"))
+print(paste("Testing Set:", nrow(test_data), "rows"))
+```
+
+# 4. Build an XGBoost Model (Gradient Boosting)
+
+I choose **XGBoost** for this analysis because it is highly effective at handling imbalanced datasets. Instead of generating synthetic data (which can increase noise), we use the `scale_pos_weight` parameter to explicitly tell the model that correctly predicting an "Injury" is significantly more important than predicting "No Injury". This helps balance the model's sensitivity without sacrificing too much accuracy.
+
+```{r}
+# Define the XGBoost model specification
+xg_spec <- boost_tree(
+  trees = 500,                 
+  tree_depth = 8,
+  learn_rate = 0.02,
+  min_n = 5
+) %>%
+  set_engine("xgboost", scale_pos_weight = 2.0) %>% 
+  set_mode("classification")
+
+# Define the recipe (Preprocessing with Interactions)
+xg_recipe <- recipe(injury_category ~ posted_speed_limit + weather_condition + 
+                      lighting_condition + season + crash_hour + is_weekend, 
+                    data = train_data) %>%
+  step_other(weather_condition, threshold = 0.05) %>%
+  step_other(lighting_condition, threshold = 0.05) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(terms = ~ starts_with("weather_condition"):starts_with("lighting_condition"))
+
+# Create a Workflow
+xg_workflow <- workflow() %>%
+  add_model(xg_spec) %>%
+  add_recipe(xg_recipe)
+
+# Train the model
+xg_fit <- xg_workflow %>% fit(data = train_data)
+
+print("Model Training Complete!")
+```
+
+# 5. Evaluate Model Performance
+
+```{r}
+# Make predictions on the Test Set
+predictions <- xg_fit %>%
+  predict(test_data) %>%
+  bind_cols(test_data)
+
+# Calculate Accuracy metrics
+metrics_score <- predictions %>%
+  metrics(truth = injury_category, estimate = .pred_class) %>%
+  filter(.metric %in% c("accuracy", "kap"))
+
+print(metrics_score)
+
+# --- Visualization: Confusion Matrix Heatmap ---
+conf_mat_result <- predictions %>%
+  conf_mat(truth = injury_category, estimate = .pred_class)
+
+# Plotting the Heatmap
+heatmap_plot <- autoplot(conf_mat_result, type = "heatmap") +
+  scale_fill_gradient(low = "#e0f3db", high = "#0868ac") + 
+  labs(
+    title = "Prediction Results Heatmap (XGBoost)",
+    subtitle = "Optimized with Class Weighting (scale_pos_weight)",
+    x = "Truth (Actual)",
+    y = "Prediction"
+  ) +
+  theme_minimal() +
+  theme(text = element_text(size = 12))
+
+print(heatmap_plot)
+```
+
+# 6. Feature Importance (Key Insights)
+
+```{r}
+xg_fit %>%
+  extract_fit_parsnip() %>%
+  vip(num_features = 10, geom = "col", aesthetics = list(fill = "#e6550d")) +
+  labs(
+    title = "Top Risk Factors for Crash Injuries (XGBoost)", 
+    subtitle = "Higher Importance indicates stronger influence on crash severity",
+    y = "Importance (Gain)",
+    x = "Variable"
+  ) +
+  theme_minimal()
+
+print(xg_fit)
+```
+
