@@ -188,3 +188,15 @@ ggplot(hourly_risk, aes(x = crash_hour, y = injury_rate)) +
   ) +
   theme_minimal()
 ```
+
+# 8. Save Model for Shiny App
+
+```{r}
+# We need to save the trained workflow so the App can use it to make live predictions.
+if(!dir.exists("../models")) dir.create("../models")
+
+# Save the XGBoost fit object
+saveRDS(xg_fit, "../models/xgboost_model.rds")
+
+print("Model successfully saved to models/xgboost_model.rds")
+```
