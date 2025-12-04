@@ -34,11 +34,13 @@ glimpse(crashes_clean)
 
 We will use the following features to predict `injury_category`:
 
-*   **Environmental:** `weather_condition`, `lighting_condition`, `roadway_surface_cond`
+* **Environmental:** `weather_condition`, `lighting_condition`, `roadway_surface_cond`
 
-*   **Temporal:** `crash_hour`, `season`, `is_weekend`
+* **Temporal:** `crash_hour`, `season`, `is_weekend`
 
-*   **Infrastructure:** `posted_speed_limit`
+* **Infrastructure:** `posted_speed_limit`
+
+* **Geographic:** `city_side`
 
 ```{r}
 # Convert character strings to factors (required for modeling)
@@ -49,11 +51,13 @@ model_data <- crashes_clean %>%
     lighting_condition = as.factor(lighting_condition),
     roadway_surface_cond = as.factor(roadway_surface_cond),
     season = as.factor(season),
-    is_weekend = as.factor(is_weekend)
+    is_weekend = as.factor(is_weekend),
+    city_side = as.factor(city_side) # <--- NEW: Include City Side (Region)
   ) %>%
   drop_na()
 
-# Split data: 75% for Training, 25% for Testing
+# Split data: 
+# 75% for Training, 25% for Testing
 data_split <- initial_split(model_data, prop = 0.75, strata = injury_category)
 train_data <- training(data_split)
 test_data  <- testing(data_split)
@@ -79,11 +83,14 @@ xg_spec <- boost_tree(
 
 # Define the recipe (Preprocessing with Interactions)
 xg_recipe <- recipe(injury_category ~ posted_speed_limit + weather_condition + 
-                      lighting_condition + season + crash_hour + is_weekend, 
+                      lighting_condition + season + crash_hour + is_weekend + city_side, 
                     data = train_data) %>%
+  # Group infrequent weather/lighting categories into "Other" to reduce noise
   step_other(weather_condition, threshold = 0.05) %>%
   step_other(lighting_condition, threshold = 0.05) %>%
+  # Convert all categorical factors (like city_side) into dummy variables (0/1)
   step_dummy(all_nominal_predictors()) %>%
+  # Interaction term: Does bad weather + bad lighting equal extra risk?
   step_interact(terms = ~ starts_with("weather_condition"):starts_with("lighting_condition"))
 
 # Create a Workflow
@@ -152,14 +159,13 @@ print(xg_fit)
 
 ```{r}
 library(scales)
-
-# Prepare plotting data: Calculate "Injury Rate" for each hour
+# Prepare plotting data
 hourly_risk <- crashes_clean %>%
+  filter(!is.na(crash_hour), !is.na(injury_category)) %>%
   group_by(crash_hour) %>%
   summarise(
     total_crashes = n(),
     injury_count = sum(injury_category == "Injury"),
-    # Calculate injury rate: Injury count / Total crashes
     injury_rate = injury_count / total_crashes 
   )
 
@@ -169,19 +175,19 @@ ggplot(hourly_risk, aes(x = crash_hour, y = injury_rate)) +
   geom_line(color = "#e6550d", size = 1.5) +
   geom_point(color = "#e6550d", size = 3) +
   
-  # Add a dashed line: Represents the average injury rate for comparison
-  geom_hline(yintercept = mean(hourly_risk$injury_rate), 
+  # Add a dashed line: Average injury rate
+  geom_hline(yintercept = mean(hourly_risk$injury_rate, na.rm = TRUE), 
              linetype = "dashed", color = "gray50") +
   
-  # Annotate key areas (You can adjust the x range based on the plot results)
-  annotate("text", x = 3, y = max(hourly_risk$injury_rate), 
+  # Annotate key areas
+  annotate("text", x = 3, y = max(hourly_risk$injury_rate, na.rm = TRUE), 
            label = "High Risk: Late Night", color = "#e6550d", fontface = "bold") +
   
   # Customize the chart
-  scale_x_continuous(breaks = seq(0, 23, 2)) + # One tick every 2 hours
-  scale_y_continuous(labels = percent_format()) + # Display y-axis as percentage
+  scale_x_continuous(breaks = seq(0, 23, 2)) + 
+  scale_y_continuous(labels = percent_format()) + 
   labs(
-    title = "How does 'Crash Hour' Important?",
+    title = "How Important is 'Crash Hour'?",
     subtitle = "Injury Rate peaks late at night, despite fewer cars.",
     x = "Hour of Day (0 = Midnight)",
     y = "Injury Rate (Probability of Injury)"
