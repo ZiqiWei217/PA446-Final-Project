@@ -39,6 +39,7 @@ This project is built using **R** and the **Shiny/Quarto** framework. Key steps 
     * **Feature Engineering:** Derived temporal features (`Season`, `Weekend_Indicator`) and categorized risk factors to enhance analytical depth.
 3.  **Advanced Analysis (Machine Learning):** * **Algorithm:** Implemented an **XGBoost (Gradient Boosting)** model using `tidymodels` to predict the probability of crash injuries.
     * **Optimization:** Applied `scale_pos_weight` parameters to handle class imbalance between injury and non-injury outcomes.
-4.  **Visualization & Interaction:** * **Mapping:** Interactive, clustered crash maps using `leaflet`.
+4.  **Visualization & Interaction:**
+    * **Mapping:** Interactive, clustered crash maps using `leaflet`.
     * **Hierarchical Logic:** Implemented cascading user inputs (Region → Neighborhood) for localized risk simulation.
     * **Dynamic Charts:** Trend analysis using `ggplot2` and `plotly`.
