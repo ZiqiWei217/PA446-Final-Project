@@ -1,8 +1,12 @@
 ---
 title: "Chicago Traffic Crash Analysis & Prediction"
 author: "Ziqi Wei"
-format: html
+format: pdf
 editor: visual
+execute:
+  warning: false
+  message: false
+  echo: true
 ---
 # 1. Project Goal
 
@@ -144,3 +148,43 @@ xg_fit %>%
 print(xg_fit)
 ```
 
+# 7. Deep Dive into crash_hour
+
+```{r}
+library(scales)
+
+# Prepare plotting data: Calculate "Injury Rate" for each hour
+hourly_risk <- crashes_clean %>%
+  group_by(crash_hour) %>%
+  summarise(
+    total_crashes = n(),
+    injury_count = sum(injury_category == "Injury"),
+    # Calculate injury rate: Injury count / Total crashes
+    injury_rate = injury_count / total_crashes 
+  )
+
+# Plot an intuitive line chart
+ggplot(hourly_risk, aes(x = crash_hour, y = injury_rate)) +
+  # Plot the trend line
+  geom_line(color = "#e6550d", size = 1.5) +
+  geom_point(color = "#e6550d", size = 3) +
+  
+  # Add a dashed line: Represents the average injury rate for comparison
+  geom_hline(yintercept = mean(hourly_risk$injury_rate), 
+             linetype = "dashed", color = "gray50") +
+  
+  # Annotate key areas (You can adjust the x range based on the plot results)
+  annotate("text", x = 3, y = max(hourly_risk$injury_rate), 
+           label = "High Risk: Late Night", color = "#e6550d", fontface = "bold") +
+  
+  # Customize the chart
+  scale_x_continuous(breaks = seq(0, 23, 2)) + # One tick every 2 hours
+  scale_y_continuous(labels = percent_format()) + # Display y-axis as percentage
+  labs(
+    title = "How does 'Crash Hour' Important?",
+    subtitle = "Injury Rate peaks late at night, despite fewer cars.",
+    x = "Hour of Day (0 = Midnight)",
+    y = "Injury Rate (Probability of Injury)"
+  ) +
+  theme_minimal()
+```
