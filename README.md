@@ -31,14 +31,15 @@ All data is sourced programmatically from the **Chicago Data Portal** via API:
     *   *Format:* GeoJSON / Shapefile
     *   *Usage:* Used to aggregate crash points into 77 distinct neighborhoods for the interactive map layers and demographic comparison.
 
-##  Methodology & Tech Stack
+## Methodology & Tech Stack
 This project is built using **R** and the **Shiny/Quarto** framework. Key steps include:
+
 1.  **Data Acquisition:** Fetched via Socrata Open Data API (`RSocrata`) with strict filtering to manage dataset size.
-2.  **Data Wrangling:** 
-    *   Spatial cleaning (removing invalid coordinates).
-    *   **Feature Engineering:** Added derived features such as `Seasonality`, `Weekend_Indicator`, and `Crash_Severity` levels to enhance analytical depth.
-3.  **Advanced Analysis (Machine Learning):** 
-    *   Implemented a classification model (Decision Tree/Logistic Regression) to predict crash severity based on road and weather conditions.
-4.  **Visualization:** 
-    *   Interactive maps using `leaflet`.
-    *   Dynamic charts using `ggplot2` and `plotly`.
+2.  **Data Wrangling & Spatial Analysis:** * **Spatial Joins:** Utilized the `sf` package to map raw GPS coordinates to official Chicago Community Areas (1-77) and 9 broader City Sides.
+    * **Feature Engineering:** Derived temporal features (`Season`, `Weekend_Indicator`) and categorized risk factors to enhance analytical depth.
+3.  **Advanced Analysis (Machine Learning):** * **Algorithm:** Implemented an **XGBoost (Gradient Boosting)** model using `tidymodels` to predict the probability of crash injuries.
+    * **Optimization:** Applied `scale_pos_weight` parameters to handle class imbalance between injury and non-injury outcomes.
+4.  **Visualization & Interaction:**
+    * **Mapping:** Interactive, clustered crash maps using `leaflet`.
+    * **Hierarchical Logic:** Implemented cascading user inputs (Region → Neighborhood) for localized risk simulation.
+    * **Dynamic Charts:** Trend analysis using `ggplot2` and `plotly`.
