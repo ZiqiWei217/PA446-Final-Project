@@ -206,3 +206,17 @@ saveRDS(xg_fit, "../models/xgboost_model.rds")
 
 print("Model successfully saved to models/xgboost_model.rds")
 ```
+
+# 9. Discussion: Ethics & Fairness
+
+### Model Limitations & Bias
+
+> While this XGBoost model achieves high accuracy, we must acknowledge potential biases in the underlying data. "Hit-and-run" crashes or minor accidents in underserved neighborhoods (e.g., West Side, South Side) may be under-reported due to lack of trust in law enforcement. This could lead the model to underestimate risk in these areas.
+
+### Fairness in Application
+
+> The feature importance plot highlights `city_side` as a predictor. We must be careful not to use this result to stigmatize specific neighborhoods or justify over-policing. Instead, this finding should direct **infrastructure investment** (better lighting, traffic calming) to the West and South Sides, rather than punitive enforcement.
+
+### Policy Recommendation
+
+> Policymakers should use this tool as a "screening" mechanism to identify high-risk conditions, but human experts must validate specific interventions to ensure equitable resource allocation across all of Chicago's community areas.
